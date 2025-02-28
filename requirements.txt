@@ -1,0 +1,6 @@
+streamlit==1.32.0
+skyfield==1.46
+pytz==2024.1
+icalendar==5.0.11
+pandas==2.2.0
+psutil==5.9.8 
