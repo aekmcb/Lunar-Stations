@@ -1,18 +1,17 @@
 # Lunar Stations Calculator
 
-A Streamlit application that calculates and tracks lunar station timings based on your location. This program helps users follow the traditional practice of tracking the Moon's movement through the ecliptic pathway using modern astronomical calculations.
+A Streamlit web application that calculates lunar stations based on the user's location and time preferences. This program tracks the Moon's movement through the ecliptic pathway of stars in real-time.
 
 ## Features
 
-- Real-time tracking of lunar stations based on user location
-- Precise calculations using NASA's DE421 ephemeris data
-- Flexible date range selection (up to 60 days)
-- Multiple output formats:
-  - CSV file (for spreadsheets and databases)
-  - ICS file (for calendar applications)
-- Customizable timezone settings
-- Optional calendar alerts
+- Calculates precise starting times for lunar stations based on user location
+- Supports both Northern and Southern hemispheres
+- Provides ecliptic longitude and latitude calculations
+- Includes detailed star descriptions for each lunar station
+- Outputs in both CSV and ICS (calendar) formats
+- Automatic timezone and DST handling
 - Interactive preview of results
+- Up to 365 days of calculations
 
 ## Installation
 
@@ -21,55 +20,74 @@ A Streamlit application that calculates and tracks lunar station timings based o
 git clone [your-repository-url]
 ```
 
-2. Install required packages:
+2. Install required dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-1. Run the Streamlit app:
+Run the Streamlit app:
 ```bash
 streamlit run lunar_stations_app.py
 ```
 
-2. Enter your location details:
-   - Latitude and Longitude (can be found using Google Maps)
-   - Select your timezone
-   - Choose start and end dates/times
+## Input Parameters
 
-3. Select your preferred output format (CSV or ICS)
+- **Latitude** (-90° to 90°): Negative for Southern Hemisphere
+- **Longitude** (-180° to 180°): Negative for Western Hemisphere
+- **Timezone**: Select nearest city (DST handled automatically)
+- **Date Range**: Select start and end dates (up to 365 days)
 
-4. Click "Calculate Lunar Stations" to generate results
+## Output Options
+
+- CSV format (compatible with spreadsheets and Notion)
+- ICS format (calendar integration)
+- Optional data fields:
+  - Ecliptic longitude
+  - Ecliptic latitude
+  - Star descriptions
+  - Calendar alerts (ICS only)
+
+## Data Sources
+
+- Star positions based on precessed tropical coordinates from J.M. Hamade's 'Procession of the Night Theatre' (Revelore Press, 2024)
+- Star identifications verified using the Hipparcos Catalogue (ESA, 1997)
+- Astronomical calculations performed using the Skyfield library and DE421 ephemeris
 
 ## Dependencies
 
-- Python 3.7+
+- Python 3.x
 - Streamlit
 - Skyfield
 - pytz
 - icalendar
 - pandas
+- numpy
 - psutil
+- Additional libraries: csv, datetime
 
-## Technical Details
+## Privacy
 
-- Calculations are based on the DE421 ephemeris from NASA's Jet Propulsion Laboratory
-- Lunar station positions are derived from J.M. Hamade's "The Procession of the Night Theatre" (Revelore Press, 2024)
-- All calculations are performed locally in the user's browser
+This application runs on Streamlit's platform. While calculations are performed server-side:
+- No user data or calculation results are permanently stored
+- Session data is temporarily cached during use and cleared upon closing
+- Location inputs and results are not collected or retained
+- No personal information is tracked or stored
 
-## Privacy Notice
-
-This application performs all calculations locally. No user data, location information, or calculation results are stored or collected. All inputs are temporary and are cleared when you close the application.
+For more information about Streamlit's data handling, please visit their privacy policy at https://streamlit.io/privacy-policy
 
 ## License
 
-Copyright (c) 2025 Living Electric Language LLC
-Licensed under the MIT License - see LICENSE file for details
+MIT License - See LICENSE file for details
 
 ## Contact
 
 Email: info@livingelectriclanguage.com
+
+## Version
+
+App Version 1.1 (Updated 2024-04-04)
 
 ## Disclaimer
 
