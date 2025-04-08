@@ -86,9 +86,8 @@ MIT License - See LICENSE file for details
 Email: info@livingelectriclanguage.com
 
 ## Version
-1.1 April 4, 2025
 
-App Version 1.1 (Updated 2024-04-04)
+App Version 1.1 (Updated 2025-04-04)
 
 ## Disclaimer
 
