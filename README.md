@@ -34,8 +34,8 @@ streamlit run lunar_stations_app.py
 
 ## Input Parameters
 
-- **Latitude** (-90° to 90°): Negative for Southern Hemisphere
-- **Longitude** (-180° to 180°): Negative for Western Hemisphere
+- **Latitude** (0° to 90°): N for Northern and S for Southern Hemispheres
+- **Longitude** (-180° to 180°): W for Western and E for Eastern Hemisphere
 - **Timezone**: Select nearest city (DST handled automatically)
 - **Date Range**: Select start and end dates (up to 365 days)
 
