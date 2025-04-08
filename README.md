@@ -46,7 +46,7 @@ streamlit run lunar_stations_app.py
 - Optional data fields:
   - Ecliptic longitude
   - Ecliptic latitude
-  - Star descriptions
+  - Station descriptions
   - Calendar alerts (ICS only)
 
 ## Data Sources
@@ -86,6 +86,7 @@ MIT License - See LICENSE file for details
 Email: info@livingelectriclanguage.com
 
 ## Version
+1.1 April 4, 2025
 
 App Version 1.1 (Updated 2024-04-04)
 
