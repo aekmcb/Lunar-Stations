@@ -255,7 +255,7 @@ def main():
     st.markdown("""
     This simple app tracks in real time the Moon's movement through the *ecliptic pathway* of stars based on your location. 
 
-    Throughout history, astrologers from Arabic, Vedic, and Chinese traditions developed an ingenious way to track the Moon's journey: they divided the ecliptic circle into 27-28 sections marked by distinctive *asterisms* (star patterns). These celestial waypoints became known as *Lunar Stations*. You don't need to be an astrologer to follow the Moon in its cosmic wanderings across this time-worn celestial trail. You can practice this ancient technique with modern assistance of this app.
+    Throughout history, astrologers from Arabic, Vedic, and Chinese traditions track the Moon's journey across the ecliptic by dividing the circle into 27-28 sections. These are marked by distinctive star patterns. These celestial waypoints became known as *Lunar Stations*. You can follow the Moon across this time-worn celestial trail with the modern assistance of this app.
 
     The Lunar Station starting locations in this app are based the precessed tropical coordinates found in J.M. Hamade's '*Procession of the Night Theatre*' (Revelore Press, 2024). This is an excellent and inspiring resource on the Lunar Stations across cultures.
     """)
@@ -274,12 +274,8 @@ def main():
     
     st.markdown("""
     Enter your location information for which you want to calculate the Lunar Stations:
-    * Latitude (0 to 90)
-        * Select N for Northern Hemisphere
-        * Select S for Southern Hemisphere
-    * Longitude (0 to 180)
-        * Select E for Eastern Hemisphere (Europe, Asia, Africa)
-        * Select W for Western Hemisphere (Americas)
+    * Latitude (0 to 90) - Select N for Northern or S for Southern Hemisphere
+    * Longitude (0 to 180)- Select E for Eastern or W for Western Hemisphere
     """)
     
     # Timezone Selection
@@ -464,5 +460,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
