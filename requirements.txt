@@ -1,4 +1,4 @@
-streamlit==1.45.1
+streamlit==1.46.0
 skyfield==1.46
 pytz==2024.1
 icalendar==5.0.11
