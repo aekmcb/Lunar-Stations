@@ -11,7 +11,10 @@ A Streamlit web application that calculates lunar stations based on the user's l
 - Outputs in both CSV and ICS (calendar) formats
 - Automatic timezone and DST handling
 - Interactive preview of results
-- Up to 365 days of calculations
+- Up to 31 days of calculations (1 month maximum)
+- 1-minute precision to ensure no lunar station transitions are missed
+- Sequential validation to verify complete lunar station coverage
+- Memory-optimized chunked processing for reliable performance
 
 ## Installation
 
@@ -34,10 +37,10 @@ streamlit run lunar_stations_app.py
 
 ## Input Parameters
 
-- **Latitude** (0° to 90°): N for Northern and S for Southern Hemispheres
-- **Longitude** (0° to 180°): W for Western and E for Eastern Hemisphere
+- **Latitude** (-90° to 90°): Negative for Southern Hemisphere
+- **Longitude** (-180° to 180°): Negative for Western Hemisphere
 - **Timezone**: Select nearest city (DST handled automatically)
-- **Date Range**: Select start and end dates (up to 365 days)
+- **Date Range**: Select start and end dates (up to 31 days / 1 month)
 
 ## Output Options
 
@@ -46,7 +49,7 @@ streamlit run lunar_stations_app.py
 - Optional data fields:
   - Ecliptic longitude
   - Ecliptic latitude
-  - Station descriptions
+  - Star descriptions
   - Calendar alerts (ICS only)
 
 ## Data Sources
@@ -65,7 +68,7 @@ streamlit run lunar_stations_app.py
 - pandas
 - numpy
 - psutil
-- Additional libraries: csv, datetime
+- Built-in Python libraries: csv, datetime, os, time
 
 ## Privacy
 
@@ -87,7 +90,7 @@ Email: info@livingelectriclanguage.com
 
 ## Version
 
-App Version 1.1 (Updated 2025-04-04)
+App Version 1.3 (Updated 2025-07-01)
 
 ## Disclaimer
 
