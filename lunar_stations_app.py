@@ -523,6 +523,7 @@ def main():
             - **Ephemeris Data**: DE421 from NASA's Jet Propulsion Laboratory
             - **Calendar Integration**: icalendar library for ICS file generation
             - **Timezone Handling**: pytz library for accurate time conversions
+            - **Memory Monitoring**: psutil library for process memory usage tracking
             
             #### Star Data Acknowledgment
             The station descriptions in this program were prepared using the Hipparcos Catalogue 
@@ -537,7 +538,8 @@ def main():
             - pytz (timezone handling)
             - icalendar (calendar integration)
             - pandas & numpy (data processing)
-            - Additional libraries: csv, datetime
+            - psutil (memory monitoring)
+            - Additional libraries: csv, datetime, os, time
             
             #### Version
             App Version 1.3, Updated 2025-07-01
