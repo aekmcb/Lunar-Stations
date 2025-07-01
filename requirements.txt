@@ -1,8 +1,8 @@
 streamlit==1.46.0
-skyfield==1.46
-pytz==2024.1
-icalendar==5.0.11
-pandas==2.2.0
-numpy==1.26.4
-psutil==5.9.8
+skyfield==1.53
+pytz==2025.2
+icalendar==6.3.1
+pandas==2.3.0
+numpy==2.3.1
+psutil==7.0.0
 watchdog==6.0.0
