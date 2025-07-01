@@ -12,6 +12,47 @@ import pytz
 from icalendar import Calendar, Event, Alarm
 import os
 import psutil
+import time
+
+def check_timeout(start_time, max_seconds=300):
+    """Check if calculation has exceeded timeout"""
+    if time.time() - start_time > max_seconds:
+        raise TimeoutError("Calculation timed out")
+
+def validate_lunar_station_sequence(results):
+    """Validate that lunar stations appear in sequential order"""
+    if not results:
+        return
+    
+    # Extract station numbers from results
+    station_numbers = []
+    for _, ls, _, _ in results:
+        # Extract number from "1#LS", "2#LS", etc.
+        try:
+            num = int(ls.split('#')[0])
+            station_numbers.append(num)
+        except (ValueError, IndexError):
+            continue
+    
+    if len(station_numbers) < 2:
+        return
+    
+    # Check for gaps in sequence
+    gaps = []
+    for i in range(len(station_numbers) - 1):
+        current = station_numbers[i]
+        next_station = station_numbers[i + 1]
+        
+        # Handle wraparound from 28 to 1
+        if current == 28 and next_station == 1:
+            continue
+        elif current == 1 and next_station == 28:
+            continue
+        elif next_station != current + 1:
+            gaps.append(f"Missing station between {current}#LS and {next_station}#LS")
+    
+    if gaps:
+        raise Exception(f"Lunar station sequence validation failed: {'; '.join(gaps)}")
 
 # Define lunar stations data (same as original)
 LUNAR_STATIONS = {
@@ -47,8 +88,12 @@ LUNAR_STATIONS = {
 
 def check_memory_usage():
     """Monitor memory usage and return True if within safe limits"""
-    memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024  # MB
-    return memory < 1000  # Return False if over 1GB
+    try:
+        memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024  # MB
+        return memory < 800  # More conservative limit: 800MB instead of 1GB
+    except Exception:
+        # If we can't check memory, assume it's okay but log it
+        return True
 
 def validate_time_range(start_datetime, end_datetime):
     """Validate time range and return error message if invalid"""
@@ -56,14 +101,16 @@ def validate_time_range(start_datetime, end_datetime):
         return "End time must be after start time"
     
     time_span = end_datetime - start_datetime
-    if time_span > timedelta(days=365):
-        return "Time span cannot exceed 365 days"
+    if time_span > timedelta(days=31):
+        return "Time span cannot exceed 31 days (1 month)"
     
     return None
 
 def calculate_lunar_stations(lat_deg, lat_dir, lon_deg, lon_dir, timezone, start_time, end_time, include_alerts=False):
-    """Main calculation function with error handling"""
+    """Main calculation function with optimized memory usage and chunked processing"""
     try:
+        # Start timing for timeout check
+        start_calc_time = time.time()
         # Set timezone
         local_tz = pytz.timezone(timezone)
         
@@ -80,75 +127,97 @@ def calculate_lunar_stations(lat_deg, lat_dir, lon_deg, lon_dir, timezone, start
         location = Topos(f'{lat_deg} {lat_dir}', f'{lon_deg} {lon_dir}')
         my_position = earth + location
         
-        # Calculate optimal time step based on lunar motion
+        # Calculate time span and limit to 1 month maximum
         time_span = end_time - start_time
-        if time_span > timedelta(days=365):
-            raise Exception("Time span cannot exceed 365 days")
+        if time_span > timedelta(days=31):
+            raise Exception("Time span cannot exceed 31 days (1 month)")
+        
+        # Use 1-minute intervals for all periods to ensure no lunar stations are missed
+        # Lunar stations can vary from ~5 hours to 28 hours, so we need fine sampling
+        chunk_size = timedelta(days=1)  # 1-day chunks to manage memory
+        fine_step = timedelta(minutes=1)  # Always use 1-minute intervals for accuracy
+        
+        # Process in chunks to manage memory
+        all_sorted_matches = []
+        current_chunk_start = start_time
+        
+        while current_chunk_start < end_time:
+            # Check for timeout
+            check_timeout(start_calc_time, 300)  # 5-minute timeout
             
-        # Use consistent 1-minute intervals for all time periods
-        step = timedelta(minutes=1)
-            
-        # Pre-compute time values with optimized step size
-        time_points = []
-        current = start_time
-        while current <= end_time:
             if not check_memory_usage():
                 raise Exception("Memory usage exceeded safe limits")
-            time_points.append(current)
-            current += step
-
-        times = ts.from_datetimes(time_points)
-
-        # Calculate topocentric positions (from observer's location)
-        positions = my_position.at(times).observe(moon).apparent()
-        ecl_positions = positions.ecliptic_latlon(epoch='date')
-        longitudes = ecl_positions[1].degrees % 360
-        latitudes = ecl_positions[0].degrees  # These are topocentric latitudes
-
-        # Process results
-        all_matches = {lon: [] for lon in LUNAR_STATIONS.keys()}
+            
+            current_chunk_end = min(current_chunk_start + chunk_size, end_time)
+            
+            # Generate 1-minute time points for this chunk
+            fine_time_points = []
+            current = current_chunk_start
+            while current <= current_chunk_end:
+                fine_time_points.append(current)
+                current += fine_step
+            
+            if not fine_time_points:
+                current_chunk_start = current_chunk_end
+                continue
+            
+            # Step 3: Fine scanning for precise lunar station crossings
+            fine_times = ts.from_datetimes(fine_time_points)
+            fine_positions = my_position.at(fine_times).observe(moon).apparent()
+            fine_ecl_positions = fine_positions.ecliptic_latlon(epoch='date')
+            fine_longitudes = fine_ecl_positions[1].degrees % 360
+            fine_latitudes = fine_ecl_positions[0].degrees
+            
+            # Step 4: Find exact lunar station crossings
+            chunk_matches = {lon: [] for lon in LUNAR_STATIONS.keys()}
+            
+            for lon_target in LUNAR_STATIONS.keys():
+                min_difference = float('inf')
+                min_time = None
+                min_lon = None
+                min_lat = None
+                last_difference = float('inf')
+                
+                for i, lon in enumerate(fine_longitudes):
+                    difference = min(
+                        abs(lon - lon_target),
+                        abs(lon - lon_target + 360),
+                        abs(lon - lon_target - 360)
+                    )
+                    
+                    if difference < 0.008:  # Within ~0.5 arcminute
+                        if difference < min_difference:
+                            min_difference = difference
+                            min_time = fine_time_points[i]
+                            min_lon = lon
+                            min_lat = fine_latitudes[i]
+                            
+                    elif last_difference < 0.008 and min_time is not None:
+                        chunk_matches[lon_target].append((min_time, min_lon, min_lat))
+                        min_difference = float('inf')
+                        min_time = None
+                        min_lon = None
+                        min_lat = None
+                    
+                    last_difference = difference
+                
+                if min_time is not None:
+                    chunk_matches[lon_target].append((min_time, min_lon, min_lat))
+            
+            # Add chunk results to overall results
+            for lon_target, matches in chunk_matches.items():
+                ls, _ = LUNAR_STATIONS[lon_target]
+                for match_time, lon, lat in matches:
+                    all_sorted_matches.append((match_time, ls, lon, lat))
+            
+            # Move to next chunk
+            current_chunk_start = current_chunk_end
         
-        for lon_target in LUNAR_STATIONS.keys():
-            min_difference = float('inf')
-            min_time = None
-            min_lon = None
-            min_lat = None
-            last_difference = float('inf')
-            
-            for i, lon in enumerate(longitudes):
-                difference = min(
-                    abs(lon - lon_target),
-                    abs(lon - lon_target + 360),
-                    abs(lon - lon_target - 360)
-                )
-                
-                if difference < 0.008:
-                    if difference < min_difference:
-                        min_difference = difference
-                        min_time = time_points[i]
-                        min_lon = lon
-                        min_lat = latitudes[i]
-                        
-                elif last_difference < 0.008 and min_time is not None:
-                    all_matches[lon_target].append((min_time, min_lon, min_lat))
-                    min_difference = float('inf')
-                    min_time = None
-                    min_lon = None
-                    min_lat = None
-                
-                last_difference = difference
-            
-            if min_time is not None:
-                all_matches[lon_target].append((min_time, min_lon, min_lat))
-
-        # Collect and sort all matches
-        all_sorted_matches = []
-        for lon_target, matches in all_matches.items():
-            ls, _ = LUNAR_STATIONS[lon_target]
-            for match_time, lon, lat in matches:
-                all_sorted_matches.append((match_time, ls, lon, lat))
-
+        # Sort all results by time
         all_sorted_matches.sort(key=lambda x: x[0])
+        
+        # Validate that we have sequential lunar station transitions
+        validate_lunar_station_sequence(all_sorted_matches)
         
         return all_sorted_matches
 
@@ -291,7 +360,7 @@ def main():
     """)
     
     # Date Range Selection
-    st.header("Date Range (up to 365 days)")
+    st.header("Date Range (up to 31 days)")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -388,75 +457,104 @@ def main():
         st.warning("Please acknowledge the privacy policy to proceed with the calculation.")
         return
     
+    # Add warnings for potentially problematic calculations
+    time_span_days = (end_datetime - start_datetime).days
+    if time_span_days > 14:
+        st.info(f"📅 **Date Range**: You've selected {time_span_days} days. The app uses 1-minute precision to ensure all lunar station transitions are captured.")
+    
+    if start_datetime < datetime.now(pytz.UTC) - timedelta(days=7):
+        st.info("📅 **Past Dates**: Calculating for past dates uses the same high-precision method to ensure accuracy.")
+    
     st.markdown("**Please be patient. Because the Lunar Station start times are location specific, the calculation may take a few minutes.**")
     
     if st.button("Calculate the Lunar Stations"):
-        with st.spinner("Calculating lunar stations..."):
-            try:
-                results = calculate_lunar_stations(
-                    lat_deg, lat_dir, lon_deg, lon_dir, timezone, 
-                    start_datetime, end_datetime, include_alerts
-                )
-                
-                if output_format == "CSV":
-                    filename = "lunar_stations.csv"
-                    save_to_csv(results, timezone, filename, include_longitude, include_latitude, include_description)
-                    with open(filename, "rb") as file:
-                        st.download_button(
-                            label="Download CSV",
-                            data=file,
-                            file_name=filename,
-                            mime="text/csv"
-                        )
-                else:
-                    filename = "lunar_stations.ics"
-                    save_to_ics(results, timezone, include_alerts, filename, include_longitude, include_latitude, include_description)
-                    with open(filename, "rb") as file:
-                        st.download_button(
-                            label="Download ICS",
-                            data=file,
-                            file_name=filename,
-                            mime="text/calendar"
-                        )
-                
-                st.success("Calculation complete! Click the download button above to get your results.")
-                
-                st.markdown("""
-                #### Disclaimer
-                This calculator is provided for informational and educational purposes only. While we strive for accuracy in astronomical calculations, users should verify critical timings independently. The creators and contributors of this application are not liable for any decisions, actions, or consequences resulting from the use of this tool.
-                
-                All calculations are based on the DE421 ephemeris and Skyfield library's implementation. Actual astronomical observations may vary due to local conditions, atmospheric effects, and other factors.
-                
-                #### Additional Credits
-                - **Astronomical Calculations**: [Skyfield](https://rhodesmill.org/skyfield/) by Brandon Rhodes
-                - **Ephemeris Data**: DE421 from NASA's Jet Propulsion Laboratory
-                - **Calendar Integration**: icalendar library for ICS file generation
-                - **Timezone Handling**: pytz library for accurate time conversions
-                
-                #### Star Data Acknowledgment
-                The station descriptions in this program were prepared using the Hipparcos Catalogue 
-                (ESA, 1997) to identify and verify the bright stars (5 or brighter) along the Moon's path. 
-                This identification process was done separately from this program, and the 
-                resulting descriptions were incorporated into the program's database.
-                
-                #### Technical Stack
-                - Python 3.x
-                - Streamlit web framework
-                - Skyfield (astronomical calculations)
-                - pytz (timezone handling)
-                - icalendar (calendar integration)
-                - pandas & numpy (data processing)
-                - Additional libraries: csv, datetime
-                
-                #### Version
-                App Version 1.1, Updated 2025-04-04
-                
-                #### Contact
-                Email: info@livingelectriclanguage.com
-                """)
-                
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+        # Create progress indicators
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        try:
+            status_text.text("Initializing calculation...")
+            progress_bar.progress(10)
+            
+            status_text.text("Loading ephemeris data...")
+            progress_bar.progress(20)
+            
+            results = calculate_lunar_stations(
+                lat_deg, lat_dir, lon_deg, lon_dir, timezone, 
+                start_datetime, end_datetime, include_alerts
+            )
+            
+            progress_bar.progress(90)
+            status_text.text("Finalizing results...")
+            
+            if output_format == "CSV":
+                filename = "lunar_stations.csv"
+                save_to_csv(results, timezone, filename, include_longitude, include_latitude, include_description)
+                with open(filename, "rb") as file:
+                    st.download_button(
+                        label="Download CSV",
+                        data=file,
+                        file_name=filename,
+                        mime="text/csv"
+                    )
+            else:
+                filename = "lunar_stations.ics"
+                save_to_ics(results, timezone, include_alerts, filename, include_longitude, include_latitude, include_description)
+                with open(filename, "rb") as file:
+                    st.download_button(
+                        label="Download ICS",
+                        data=file,
+                        file_name=filename,
+                        mime="text/calendar"
+                    )
+            
+            progress_bar.progress(100)
+            status_text.text("Complete!")
+            st.success("Calculation complete! Click the download button above to get your results.")
+            
+            st.markdown("""
+            #### Disclaimer
+            This calculator is provided for informational and educational purposes only. While we strive for accuracy in astronomical calculations, users should verify critical timings independently. The creators and contributors of this application are not liable for any decisions, actions, or consequences resulting from the use of this tool.
+            
+            All calculations are based on the DE421 ephemeris and Skyfield library's implementation. Actual astronomical observations may vary due to local conditions, atmospheric effects, and other factors.
+            
+            #### Additional Credits
+            - **Astronomical Calculations**: [Skyfield](https://rhodesmill.org/skyfield/) by Brandon Rhodes
+            - **Ephemeris Data**: DE421 from NASA's Jet Propulsion Laboratory
+            - **Calendar Integration**: icalendar library for ICS file generation
+            - **Timezone Handling**: pytz library for accurate time conversions
+            
+            #### Star Data Acknowledgment
+            The station descriptions in this program were prepared using the Hipparcos Catalogue 
+            (ESA, 1997) to identify and verify the bright stars (5 or brighter) along the Moon's path. 
+            This identification process was done separately from this program, and the 
+            resulting descriptions were incorporated into the program's database.
+            
+            #### Technical Stack
+            - Python 3.x
+            - Streamlit web framework
+            - Skyfield (astronomical calculations)
+            - pytz (timezone handling)
+            - icalendar (calendar integration)
+            - pandas & numpy (data processing)
+            - Additional libraries: csv, datetime
+            
+            #### Version
+            App Version 1.3, Updated 2025-07-01
+            
+            #### Contact
+            Email: info@livingelectriclanguage.com
+            """)
+            
+        except TimeoutError:
+            progress_bar.progress(0)
+            status_text.text("Calculation timed out")
+            st.error("The calculation took too long and was cancelled. Please try a shorter time period or contact support if the problem persists.")
+        except Exception as e:
+            progress_bar.progress(0)
+            status_text.text("Error occurred")
+            st.error(f"An error occurred: {str(e)}")
+            st.info("If you're calculating for a long time period or past dates, try reducing the date range to 14 days or less.")
 
 if __name__ == "__main__":
     main()
